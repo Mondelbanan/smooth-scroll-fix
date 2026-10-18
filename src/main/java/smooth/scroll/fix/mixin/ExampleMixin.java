@@ -9,10 +9,60 @@ import smooth.scroll.fix.SpeedSettings;
 @Mixin(targets = "net.minecraft.client.player.LocalPlayer")
 public class ExampleMixin {
 
-    // 1. ПРИМЕНЕНИЕ СКОРОСТИ В ДВИЖЕНИИ
+    private static boolean upPressed = false;
+    private static boolean downPressed = false;
+    private static boolean leftPressed = false;
+
     @Inject(method = "tick", at = @At("HEAD"))
     private void modifyPlayer(CallbackInfo ci) {
         Object player = (Object) this;
+
+        // ОБРАБОТКА НАЖАТИЙ КЛАВИШ (Управление скоростью без чата и команд)
+        try {
+            long window = (long) Class.forName("net.minecraft.client.Minecraft").getMethod("getInstance").invoke(null)
+                    .getClass().getField("window").get(Class.forName("net.minecraft.client.Minecraft").getMethod("getInstance").invoke(null));
+            
+            Class<?> glfwClass = Class.forName("org.lwjgl.glfw.GLFW");
+            java.lang.reflect.Method get_key = glfwClass.getMethod("glfwGetKey", long.class, int.class);
+
+            int keyUp = glfwClass.getField("GLFW_KEY_UP").getInt(null);
+            int keyDown = glfwClass.getField("GLFW_KEY_DOWN").getInt(null);
+            int keyLeft = glfwClass.getField("GLFW_KEY_LEFT").getInt(null);
+
+            // Нажата стрелочка ВВЕРХ (Скорость: 1.15 / 1.08)
+            if ((int) get_key.invoke(null, window, keyUp) == 1) {
+                if (!upPressed) {
+                    SpeedSettings.walkMultiplier = 1.15;
+                    SpeedSettings.waterMultiplier = 1.08;
+                    SpeedSettings.sendMessage(player, "§a[Mod] Установлена стандартная скорость (Ходьба: 1.15, Вода: 1.08)");
+                    upPressed = true;
+                }
+            } else { upPressed = false; }
+
+            // Нажата стрелочка ВНИЗ (Скорость: 1.35 / 1.15)
+            if ((int) get_key.invoke(null, window, keyDown) == 1) {
+                if (!downPressed) {
+                    SpeedSettings.walkMultiplier = 1.35;
+                    SpeedSettings.waterMultiplier = 1.15;
+                    SpeedSettings.sendMessage(player, "§b[Mod] Установлена быстрая скорость (Ходьба: 1.35, Вода: 1.15)");
+                    downPressed = true;
+                }
+            } else { downPressed = false; }
+
+            // Нажата стрелочка ВЛЕВО (Сброс на 1.0)
+            if ((int) get_key.invoke(null, window, keyLeft) == 1) {
+                if (!leftPressed) {
+                    SpeedSettings.walkMultiplier = 1.0;
+                    SpeedSettings.waterMultiplier = 1.0;
+                    SpeedSettings.sendMessage(player, "§c[Mod] Модификаторы скорости сброшены на стандарт (1.0)");
+                    leftPressed = true;
+                }
+            } else { leftPressed = false; }
+
+        } catch (Exception ignored) {}
+
+
+        // ПРИМЕНЕНИЕ СКОРОСТИ В ДВИЖЕНИИ (Mojmap блок)
         try {
             java.lang.reflect.Method isInWaterMethod = player.getClass().getMethod("isInWater");
             boolean inWater = (boolean) isInWaterMethod.invoke(player);
@@ -41,6 +91,7 @@ public class ExampleMixin {
                 setDelta.invoke(player, newVec3d);
             }
         } catch (Exception e) {
+            // Резервный блок Yarn
             try {
                 java.lang.reflect.Method isSubmergedInWater = player.getClass().getMethod("isSubmergedInWater");
                 boolean inWaterYarn = (boolean) isSubmergedInWater.invoke(player);
@@ -73,30 +124,6 @@ public class ExampleMixin {
                     setVelocity.invoke(player, newVec3dYarn);
                 }
             } catch (Exception ignored) {}
-        }
-    }
-
-    // 2. ХЕНДЛЕР ТЕКСТОВЫХ КОМАНД ЧЕРЕЗ ЧАТ
-    @Inject(method = "chat", at = @At("HEAD"), cancellable = true)
-    private void interceptChat(String message, CallbackInfo ci) {
-        if (message.startsWith(".walk ") || message.startsWith(".water ")) {
-            ci.cancel(); // Отменяем отправку сообщения на сервер, чтобы никто не увидел
-            
-            try {
-                String[] parts = message.split(" ");
-                if (parts.length < 2) return;
-                double value = Double.parseDouble(parts[1]);
-
-                if (message.startsWith(".walk ")) {
-                    SpeedSettings.walkMultiplier = value;
-                    SpeedSettings.sendMessage(this, "§a[Mod] Скорость ходьбы изменена на: " + value);
-                } else {
-                    SpeedSettings.waterMultiplier = value;
-                    SpeedSettings.sendMessage(this, "§b[Mod] Скорость в воде изменена на: " + value);
-                }
-            } catch (Exception e) {
-                SpeedSettings.sendMessage(this, "§c[Mod] Ошибка! Используйте: .walk 1.15 или .water 1.08");
-            }
         }
     }
 }
