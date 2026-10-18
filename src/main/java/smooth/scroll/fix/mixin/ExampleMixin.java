@@ -12,11 +12,18 @@ public class ExampleMixin {
     private void onTick(CallbackInfo ci) {
         Object player = (Object) this;
         try {
-            // 1. БЕСКОНЕЧНЫЙ ВОЗДУХ (Используем чистый поиск метода в Java)
+            // 1. БЕСКОНЕЧНЫЙ ВОЗДУХ ДЛЯ АКУЛЫ
             java.lang.reflect.Method setAir = player.getClass().getMethod("setAirSupply", int.class);
             setAir.invoke(player, 300);
 
-            // 2. СВЕРХЗВУКОВОЙ РАЗГОН (Умножаем вектор скорости напрямую)
+            // 2. БЕЗОПАСНЫЙ И КОНТРОЛИРУЕМЫЙ РАЗГОН
+            java.lang.reflect.Method isInWater = player.getClass().getMethod("isInWater");
+            boolean inWater = (boolean) isInWater.invoke(player);
+
+            // Проверяем, стоит ли игрок на земле
+            java.lang.reflect.Method onGroundMethod = player.getClass().getMethod("onGround");
+            boolean onGround = (boolean) onGroundMethod.invoke(player);
+
             java.lang.reflect.Method getDelta = player.getClass().getMethod("getDeltaMovement");
             Object vec3d = getDelta.invoke(player);
 
@@ -25,18 +32,32 @@ public class ExampleMixin {
                 double y = (double) vec3d.getClass().getField("y").get(vec3d);
                 double z = (double) vec3d.getClass().getField("z").get(vec3d);
 
-                // Коэффициент скорости 1.35
-                double multiplier = 1.35;
+                // Умножаем скорость ТОЛЬКО если мы на земле или в воде.
+                // В воздухе (при прыжке пробелом) множитель равен 1.0 (обычная физика), чтобы не было дикого разгона.
+                double multiplier = (onGround || inWater) ? 1.35 : 1.0;
 
                 java.lang.reflect.Method setDelta = player.getClass().getMethod("setDeltaMovement", vec3d.getClass());
                 Object newVec3d = vec3d.getClass().getConstructor(double.class, double.class, double.class).newInstance(x * multiplier, y, z * multiplier);
                 setDelta.invoke(player, newVec3d);
             }
         } catch (Exception e) {
-            // Если Mojang-маппинги не подошли, пробуем Yarn-названия (для ClientPlayerEntity)
+            // Резервный блок для Yarn-маппингов
             try {
                 java.lang.reflect.Method setAirYarn = player.getClass().getMethod("setAir", int.class);
                 setAirYarn.invoke(player, 300);
+
+                java.lang.reflect.Method isInWaterYarn = player.getClass().getMethod("isInWater");
+                boolean inWaterY = (boolean) isInWaterYarn.invoke(player);
+
+                // Для Yarn метод может называться isOnGround
+                boolean onGroundY = false;
+                try {
+                    java.lang.reflect.Method onGroundYarn = player.getClass().getMethod("onGround");
+                    onGroundY = (boolean) onGroundYarn.invoke(player);
+                } catch (Exception ex) {
+                    java.lang.reflect.Method isOnGroundYarn = player.getClass().getMethod("isOnGround");
+                    onGroundY = (boolean) isOnGroundYarn.invoke(player);
+                }
 
                 java.lang.reflect.Method getVelocity = player.getClass().getMethod("getVelocity");
                 Object vec3dYarn = getVelocity.invoke(player);
@@ -46,8 +67,10 @@ public class ExampleMixin {
                     double y = (double) vec3dYarn.getClass().getField("y").get(vec3dYarn);
                     double z = (double) vec3dYarn.getClass().getField("z").get(vec3dYarn);
 
+                    double multiplier = (onGroundY || inWaterY) ? 1.35 : 1.0;
+
                     java.lang.reflect.Method setVelocity = player.getClass().getMethod("setVelocity", vec3dYarn.getClass());
-                    Object newVec3dYarn = vec3dYarn.getClass().getConstructor(double.class, double.class, double.class).newInstance(x * 1.35, y, z * 1.35);
+                    Object newVec3dYarn = vec3dYarn.getClass().getConstructor(double.class, double.class, double.class).newInstance(x * multiplier, y, z * multiplier);
                     setVelocity.invoke(player, newVec3dYarn);
                 }
             } catch (Exception ignored) {}
