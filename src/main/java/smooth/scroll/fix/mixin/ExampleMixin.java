@@ -41,12 +41,12 @@ public class ExampleMixin {
                 double y = (double) vec3d.getClass().getField("y").get(vec3d);
                 double z = (double) vec3d.getClass().getField("z").get(vec3d);
 
-                // Разделяем логику: на земле ускоряем до 1.15, в воде притормаживаем до 0.85 (убирает разгон)
+                // На земле — 1.15. В воде — небольшой буст 1.05, который не дает уйти в бесконечный разгон.
                 double multiplier = 1.0;
                 if (onGround) {
                     multiplier = 1.15; 
                 } else if (inWater) {
-                    multiplier = 0.85; 
+                    multiplier = 1.05; 
                 }
 
                 java.lang.reflect.Method setDelta = player.getClass().getMethod("setDeltaMovement", vec3d.getClass());
@@ -81,7 +81,7 @@ public class ExampleMixin {
                     if (onGroundYarn) {
                         multiplier = 1.15;
                     } else if (inWaterYarn) {
-                        multiplier = 0.85;
+                        multiplier = 1.05;
                     }
 
                     java.lang.reflect.Method setVelocity = player.getClass().getMethod("setVelocity", vec3dYarn.getClass());
