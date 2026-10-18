@@ -17,7 +17,7 @@ public class SpeedSettings {
                 new Class<?>[]{callbackClass},
                 (p, method, args) -> {
                     if (method.getName().equals("register")) {
-                        setup(args[0]); // args[0] — это CommandDispatcher
+                        setup(args[0]); // Передаем CommandDispatcher из аргументов
                     }
                     return null;
                 }
@@ -70,7 +70,8 @@ public class SpeedSettings {
 
     private static void sendMessage(Object context, String text) {
         try {
-            Object source = context.getClass().getMethod("getSource").get(context);
+            // ИСПРАВЛЕНО: Правильный вызов invoke(context) вместо ошибочного .get(context)
+            Object source = context.getClass().getMethod("getSource").invoke(context);
             try {
                 Class<?> compClass = Class.forName("net.minecraft.network.chat.Component");
                 Object msg = compClass.getMethod("literal", String.class).invoke(null, text);
