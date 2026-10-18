@@ -8,9 +8,20 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(targets = "net.minecraft.client.player.LocalPlayer")
 public class ExampleMixin {
 
+    // Статические переменные, которые можно настраивать. По умолчанию стоят ваши значения.
+    public static double walkMultiplier = 1.15;
+    public static double waterMultiplier = 1.08;
+    private static boolean commandsRegistered = false;
+
     @Inject(method = "tick", at = @At("HEAD"))
     private void modifyPlayer(CallbackInfo ci) {
         Object player = (Object) this;
+
+        // Автоматическая регистрация команд при первом тике игрока
+        if (!commandsRegistered) {
+            registerSpeedCommands();
+            commandsRegistered = true;
+        }
 
         // 1. УПРАВЛЕНИЕ СКОРОСТЬЮ И ФИЗИКОЙ ВОДЫ (Блок Mojmap)
         try {
@@ -30,9 +41,9 @@ public class ExampleMixin {
 
                 double multiplier = 1.0;
                 if (onGround) {
-                    multiplier = 1.21; // Скорость ходьбы на земле
+                    multiplier = walkMultiplier; // Используем настроенную скорость ходьбы
                 } else if (inWater) {
-                    multiplier = 1.11; // Комфортная скорость в воде (без бешеного разгона)
+                    multiplier = waterMultiplier; // Используем настроенную скорость в воде
                 }
 
                 java.lang.reflect.Method setDelta = player.getClass().getMethod("setDeltaMovement", vec3d.getClass());
@@ -65,9 +76,9 @@ public class ExampleMixin {
 
                     double multiplier = 1.0;
                     if (onGroundYarn) {
-                        multiplier = 1.21;
+                        multiplier = walkMultiplier;
                     } else if (inWaterYarn) {
-                        multiplier = 1.11;
+                        multiplier = waterMultiplier;
                     }
 
                     java.lang.reflect.Method setVelocity = player.getClass().getMethod("setVelocity", vec3dYarn.getClass());
@@ -78,5 +89,100 @@ public class ExampleMixin {
             } catch (Exception ignored) {}
         }
     }
-}
+
+    // Регистрация клиентских команд через Fabric API (через рефлексию, чтобы не ломать сборку)
+    private void registerSpeedCommands() {
+        try {
+            // Пробуем зарегистрировать через ClientCommandRegistrationCallback (Fabric API)
+            Class<?> callbackClass = Class.forName("net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback");
+            java.lang.reflect.Field EVENT = callbackClass.getField("EVENT");
+            Object eventInstance = EVENT.get(null);
+
+            java.lang.reflect.Method registerMethod = eventInstance.getClass().getMethod("register", Object.class);
+
+            // Динамический прокси для создания обработчика события
+            Object proxy = java.lang.reflect.Proxy.newProxyInstance(
+                callbackClass.getClassLoader(),
+                new Class<?>[]{Class.forName("net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback")},
+                (p, method, args) -> {
+                    if (method.getName().equals("register")) {
+                        Object dispatcher = args[0];
+                        setupCommands(dispatcher);
+                    }
+                    return null;
+                }
+            );
+            registerMethod.invoke(eventInstance, proxy);
+        } catch (Exception ignored) {
+            // Если Fabric API старой версии или отсутствует, команды не зарегистрируются, но мод не вылетит
+        }
+    }
+
+    // Построение дерева команд /speed walk и /speed water
+    private void setupCommands(Object dispatcher) {
+        try {
+            Class<?> literalArgumentBuilderClass = Class.forName("com.mojang.brigadier.builder.LiteralArgumentBuilder");
+            Class<?> requiredArgumentBuilderClass = Class.forName("com.mojang.brigadier.builder.RequiredArgumentBuilder");
+            Class<?> doubleArgumentTypeClass = Class.forName("com.mojang.brigadier.arguments.DoubleArgumentType");
+            Class<?> argumentsClass = Class.forName("com.mojang.brigadier.arguments.ArgumentType");
+
+            java.lang.reflect.Method literalMethod = literalArgumentBuilderClass.getMethod("literal", String.class);
+            java.lang.reflect.Method argumentMethod = requiredArgumentBuilderClass.getMethod("argument", String.class, argumentsClass);
+            java.lang.reflect.Method doubleTypeMethod = doubleArgumentTypeClass.getMethod("doubleArg", double.class, double.class);
+            
+            // /speed
+            Object speedCommand = literalMethod.invoke(null, "speed");
+
+            // /speed walk
+            Object walkNode = literalMethod.invoke(null, "walk");
+            Object walkValueArg = argumentMethod.invoke(null, "value", doubleTypeMethod.invoke(null, 0.0, 3.0));
+            
+            // Навешиваем действие при вводе значения для ходьбы
+            java.lang.reflect.Method executesMethod = walkValueArg.getClass().getMethod("executes", Class.forName("com.mojang.brigadier.Command"));
+            Object walkExecutor = java.lang.reflect.Proxy.newProxyInstance(
+                walkValueArg.getClass().getClassLoader(),
+                new Class<?>[]{Class.forName("com.mojang.brigadier.Command")},
+                (p, method, args) -> {
+                    Object context = args[0];
+                    java.lang.reflect.Method getDouble = doubleArgumentTypeClass.getMethod("getDouble", context.getClass(), String.class);
+                    walkMultiplier = (double) getDouble.invoke(null, context, "value");
+                    sendClientMessage(context, "§aСкорость ходьбы изменена на: " + walkMultiplier);
+                    return 1;
+                }
+            );
+            executesMethod.invoke(walkValueArg, walkExecutor);
+            
+            java.lang.reflect.Method thenMethod = walkNode.getClass().getMethod("then", Class.forName("com.mojang.brigadier.builder.ArgumentBuilder"));
+            thenMethod.invoke(walkNode, walkValueArg);
+
+            // /speed water
+            Object waterNode = literalMethod.invoke(null, "water");
+            Object waterValueArg = argumentMethod.invoke(null, "value", doubleTypeMethod.invoke(null, 0.0, 3.0));
+            
+            // Навешиваем действие при вводе значения для воды
+            Object waterExecutor = java.lang.reflect.Proxy.newProxyInstance(
+                waterValueArg.getClass().getClassLoader(),
+                new Class<?>[]{Class.forName("com.mojang.brigadier.Command")},
+                (p, method, args) -> {
+                    Object context = args[0];
+                    java.lang.reflect.Method getDouble = doubleArgumentTypeClass.getMethod("getDouble", context.getClass(), String.class);
+                    waterMultiplier = (double) getDouble.invoke(null, context, "value");
+                    sendClientMessage(context, "§bСкорость в воде изменена на: " + waterMultiplier);
+                    return 1;
+                }
+            );
+            executesMethod.invoke(waterValueArg, waterExecutor);
+            thenMethod.invoke(waterNode, waterValueArg);
+
+            // Собираем всё вместе: /speed -> walk/water
+            thenMethod.invoke(speedCommand, walkNode);
+            thenMethod.invoke(speedCommand, waterNode);
+
+            // Регистрируем в главном диспетчере команд
+            java.lang.reflect.Method registerInDispatcher = dispatcher.getClass().getMethod("register", literalArgumentBuilderClass);
+            registerInDispatcher.invoke(dispatcher, speedCommand);
+
+        } catch (Exception ignored) {}
+    }
+
 
