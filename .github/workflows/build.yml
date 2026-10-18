@@ -15,17 +15,8 @@ jobs:
           distribution: 'temurin'
           java-version: '21'
 
-      - name: Validate Gradle Wrapper
-        uses: gradle/actions/wrapper-validation@v4
+      - name: Fix Linux Permissions
+        run: git update-index --chmod=+x gradlew
 
-      - name: Build with Gradle
-        uses: gradle/actions/setup-gradle@v4
-        with:
-          arguments: build
-          build-scan-publish: false
-
-      - name: Upload Mod Jar
-        uses: actions/upload-artifact@v4
-        with:
-          name: Mod-Jar
-          path: build/libs/*.jar
+      - name: Compile Jar File
+        run: ./gradlew build --no-daemon
