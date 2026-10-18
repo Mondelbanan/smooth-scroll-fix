@@ -12,13 +12,18 @@ public class ExampleMixin {
     private void modifyPlayer(CallbackInfo ci) {
         Object player = (Object) this;
 
-        // 1. БЕСКОНЕЧНЫЙ ВОЗДУХ (Mojmap)
+        // 1. БЕСКОНЕЧНЫЙ ВОЗДУХ (Выполняется гарантированно первым)
+        boolean airSetSuccessful = false;
         try {
+            // Попытка для Mojmap (1.16+)
             java.lang.reflect.Method setAirSupply = player.getClass().getMethod("setAirSupply", int.class);
             setAirSupply.invoke(player, 300);
-        } catch (Exception e) {
-            // Резервный блок для Yarn
+            airSetSuccessful = true;
+        } catch (Exception ignored) {}
+
+        if (!airSetSuccessful) {
             try {
+                // Попытка для Yarn (старые версии)
                 java.lang.reflect.Method setAir = player.getClass().getMethod("setAir", int.class);
                 setAir.setAccessible(true);
                 setAir.invoke(player, 300);
@@ -41,12 +46,11 @@ public class ExampleMixin {
                 double y = (double) vec3d.getClass().getField("y").get(vec3d);
                 double z = (double) vec3d.getClass().getField("z").get(vec3d);
 
-                // На земле — 1.15. В воде — небольшой буст 1.05, который не дает уйти в бесконечный разгон.
                 double multiplier = 1.0;
                 if (onGround) {
                     multiplier = 1.15; 
                 } else if (inWater) {
-                    multiplier = 1.05; 
+                    multiplier = 1.08; // Чуть увеличили скорость в воде для комфорта
                 }
 
                 java.lang.reflect.Method setDelta = player.getClass().getMethod("setDeltaMovement", vec3d.getClass());
@@ -81,7 +85,7 @@ public class ExampleMixin {
                     if (onGroundYarn) {
                         multiplier = 1.15;
                     } else if (inWaterYarn) {
-                        multiplier = 1.05;
+                        multiplier = 1.08; 
                     }
 
                     java.lang.reflect.Method setVelocity = player.getClass().getMethod("setVelocity", vec3dYarn.getClass());
@@ -93,3 +97,4 @@ public class ExampleMixin {
         }
     }
 }
+
