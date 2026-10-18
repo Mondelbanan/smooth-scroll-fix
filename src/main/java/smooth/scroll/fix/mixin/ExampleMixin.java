@@ -30,7 +30,7 @@ public class ExampleMixin {
 
                 double multiplier = 1.0;
                 if (onGround) {
-                    multiplier = 1.15; // Скорость ходьбы на земле
+                    multiplier = 1.9; // Скорость ходьбы на земле
                 } else if (inWater) {
                     multiplier = 1.08; // Комфортная скорость в воде (без бешеного разгона)
                 }
