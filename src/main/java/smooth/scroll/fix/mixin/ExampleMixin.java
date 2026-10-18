@@ -1,35 +1,31 @@
 package name.modid.mixin;
 
-import net.minecraft.client.player.LocalPlayer;
-import net.minecraft.world.phys.Vec3;
+import net.minecraft.client.network.ClientPlayerEntity;
+import net.minecraft.util.math.Vec3d;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
-@Mixin(LocalPlayer.class)
+@Mixin(ClientPlayerEntity.class)
 public class ExampleMixin {
 
     @Inject(method = "tick", at = @At("TAIL"))
     private void onTick(CallbackInfo ci) {
-        LocalPlayer player = (LocalPlayer) (Object) this;
+        ClientPlayerEntity player = (ClientPlayerEntity) (Object) this;
 
-        // 1. Бесконечный воздух
-        player.setAirSupply(player.getMaxAirSupply());
+        // 1. БЕСКОНЕЧНЫЙ ВОЗДУХ ДЛЯ АКУЛЫ
+        player.setAir(player.getMaxAir());
 
-        // 2. Разгон
-        boolean isMoving = player.input.sidewaysImpulse != 0 || player.input.forwardImpulse != 0;
+        // 2. СВЕРХЗВУКОВОЙ РАЗГОН (Безопасная скорость 1.35)
+        // Метод hasMovementInput() автоматически проверяет нажатие W, A, S, D
+        if (player.input.hasMovementInput() && !player.isInLava() && !player.isClimbing()) {
+            Vec3d currentVelocity = player.getVelocity();
+            double multiplier = 1.35;
 
-
-        if (isMoving && !player.isInLava() && !player.onClimbable()) {
-            Vec3 currentVelocity = player.getDeltaMovement();
-
-            // Множитель 1.35
-            double multiplier = 1.35; 
-
-            player.setDeltaMovement(
+            player.setVelocity(
                 currentVelocity.x * multiplier,
-                currentVelocity.y, 
+                currentVelocity.y,
                 currentVelocity.z * multiplier
             );
         }
