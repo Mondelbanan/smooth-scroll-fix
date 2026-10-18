@@ -1,9 +1,10 @@
-package name.modid.mixin;
+package smooth.scroll.fix.mixin;
 
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import smooth.scroll.fix.SpeedSettings; // Импортируем настройки из корня мода
 
 @Mixin(targets = "net.minecraft.client.player.LocalPlayer")
 public class ExampleMixin {
