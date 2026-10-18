@@ -8,7 +8,6 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 @Mixin(targets = "net.minecraft.client.player.LocalPlayer")
 public class ExampleMixin {
 
-    // Статические переменные, которые можно настраивать. По умолчанию стоят ваши значения.
     public static double walkMultiplier = 1.15;
     public static double waterMultiplier = 1.08;
     private static boolean commandsRegistered = false;
@@ -17,13 +16,11 @@ public class ExampleMixin {
     private void modifyPlayer(CallbackInfo ci) {
         Object player = (Object) this;
 
-        // Автоматическая регистрация команд при первом тике игрока
         if (!commandsRegistered) {
             registerSpeedCommands();
             commandsRegistered = true;
         }
 
-        // 1. УПРАВЛЕНИЕ СКОРОСТЬЮ И ФИЗИКОЙ ВОДЫ (Блок Mojmap)
         try {
             java.lang.reflect.Method isInWaterMethod = player.getClass().getMethod("isInWater");
             boolean inWater = (boolean) isInWaterMethod.invoke(player);
@@ -41,9 +38,9 @@ public class ExampleMixin {
 
                 double multiplier = 1.0;
                 if (onGround) {
-                    multiplier = walkMultiplier; // Используем настроенную скорость ходьбы
+                    multiplier = walkMultiplier;
                 } else if (inWater) {
-                    multiplier = waterMultiplier; // Используем настроенную скорость в воде
+                    multiplier = waterMultiplier;
                 }
 
                 java.lang.reflect.Method setDelta = player.getClass().getMethod("setDeltaMovement", vec3d.getClass());
@@ -52,7 +49,6 @@ public class ExampleMixin {
                 setDelta.invoke(player, newVec3d);
             }
         } catch (Exception e) {
-            // 2. УПРАВЛЕНИЕ СКОРОСТЬЮ И ФИЗИКОЙ ВОДЫ (Резервный блок Yarn)
             try {
                 java.lang.reflect.Method isSubmergedInWater = player.getClass().getMethod("isSubmergedInWater");
                 boolean inWaterYarn = (boolean) isSubmergedInWater.invoke(player);
@@ -90,17 +86,14 @@ public class ExampleMixin {
         }
     }
 
-    // Регистрация клиентских команд через Fabric API (через рефлексию, чтобы не ломать сборку)
     private void registerSpeedCommands() {
         try {
-            // Пробуем зарегистрировать через ClientCommandRegistrationCallback (Fabric API)
             Class<?> callbackClass = Class.forName("net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback");
             java.lang.reflect.Field EVENT = callbackClass.getField("EVENT");
             Object eventInstance = EVENT.get(null);
 
             java.lang.reflect.Method registerMethod = eventInstance.getClass().getMethod("register", Object.class);
 
-            // Динамический прокси для создания обработчика события
             Object proxy = java.lang.reflect.Proxy.newProxyInstance(
                 callbackClass.getClassLoader(),
                 new Class<?>[]{Class.forName("net.fabricmc.fabric.api.client.command.v2.ClientCommandRegistrationCallback")},
@@ -113,12 +106,9 @@ public class ExampleMixin {
                 }
             );
             registerMethod.invoke(eventInstance, proxy);
-        } catch (Exception ignored) {
-            // Если Fabric API старой версии или отсутствует, команды не зарегистрируются, но мод не вылетит
-        }
+        } catch (Exception ignored) {}
     }
 
-    // Построение дерева команд /speed walk и /speed water
     private void setupCommands(Object dispatcher) {
         try {
             Class<?> literalArgumentBuilderClass = Class.forName("com.mojang.brigadier.builder.LiteralArgumentBuilder");
@@ -130,14 +120,11 @@ public class ExampleMixin {
             java.lang.reflect.Method argumentMethod = requiredArgumentBuilderClass.getMethod("argument", String.class, argumentsClass);
             java.lang.reflect.Method doubleTypeMethod = doubleArgumentTypeClass.getMethod("doubleArg", double.class, double.class);
             
-            // /speed
             Object speedCommand = literalMethod.invoke(null, "speed");
 
-            // /speed walk
             Object walkNode = literalMethod.invoke(null, "walk");
             Object walkValueArg = argumentMethod.invoke(null, "value", doubleTypeMethod.invoke(null, 0.0, 3.0));
             
-            // Навешиваем действие при вводе значения для ходьбы
             java.lang.reflect.Method executesMethod = walkValueArg.getClass().getMethod("executes", Class.forName("com.mojang.brigadier.Command"));
             Object walkExecutor = java.lang.reflect.Proxy.newProxyInstance(
                 walkValueArg.getClass().getClassLoader(),
@@ -155,11 +142,9 @@ public class ExampleMixin {
             java.lang.reflect.Method thenMethod = walkNode.getClass().getMethod("then", Class.forName("com.mojang.brigadier.builder.ArgumentBuilder"));
             thenMethod.invoke(walkNode, walkValueArg);
 
-            // /speed water
             Object waterNode = literalMethod.invoke(null, "water");
             Object waterValueArg = argumentMethod.invoke(null, "value", doubleTypeMethod.invoke(null, 0.0, 3.0));
             
-            // Навешиваем действие при вводе значения для воды
             Object waterExecutor = java.lang.reflect.Proxy.newProxyInstance(
                 waterValueArg.getClass().getClassLoader(),
                 new Class<?>[]{Class.forName("com.mojang.brigadier.Command")},
@@ -174,15 +159,29 @@ public class ExampleMixin {
             executesMethod.invoke(waterValueArg, waterExecutor);
             thenMethod.invoke(waterNode, waterValueArg);
 
-            // Собираем всё вместе: /speed -> walk/water
             thenMethod.invoke(speedCommand, walkNode);
             thenMethod.invoke(speedCommand, waterNode);
 
-            // Регистрируем в главном диспетчере команд
             java.lang.reflect.Method registerInDispatcher = dispatcher.getClass().getMethod("register", literalArgumentBuilderClass);
             registerInDispatcher.invoke(dispatcher, speedCommand);
 
         } catch (Exception ignored) {}
     }
 
-
+    private void sendClientMessage(Object context, String text) {
+        try {
+            java.lang.reflect.Method getSource = context.getClass().getMethod("getSource");
+            Object source = getSource.invoke(context);
+            java.lang.reflect.Method sendFeedback = source.getClass().getMethod("sendFeedback", Class.forName("net.minecraft.network.chat.Component"));
+            
+            Class<?> componentClass = Class.forName("net.minecraft.network.chat.Component");
+            java.lang.reflect.Method literalText = componentClass.getMethod("literal", String.class);
+            Object messageComponent = literalText.invoke(null, text);
+            
+            sendFeedback.invoke(source, messageComponent);
+        } catch (Exception e) {
+            try {
+                Object source = context.getClass().getMethod("getSource").get(context);
+                java.lang.reflect.Method sendError = source.getClass().getMethod("sendError", Class.forName("net.minecraft.text.Text"));
+                Class<?> textClass = Class.forName("net.minecraft.text.Text");
+                Object textComponent = textClass.getMethod("of", String.class).invoke(null, text);
