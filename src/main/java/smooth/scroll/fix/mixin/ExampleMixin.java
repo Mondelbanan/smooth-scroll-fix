@@ -12,25 +12,7 @@ public class ExampleMixin {
     private void modifyPlayer(CallbackInfo ci) {
         Object player = (Object) this;
 
-        // 1. БЕСКОНЕЧНЫЙ ВОЗДУХ (Выполняется гарантированно первым)
-        boolean airSetSuccessful = false;
-        try {
-            // Попытка для Mojmap (1.16+)
-            java.lang.reflect.Method setAirSupply = player.getClass().getMethod("setAirSupply", int.class);
-            setAirSupply.invoke(player, 300);
-            airSetSuccessful = true;
-        } catch (Exception ignored) {}
-
-        if (!airSetSuccessful) {
-            try {
-                // Попытка для Yarn (старые версии)
-                java.lang.reflect.Method setAir = player.getClass().getMethod("setAir", int.class);
-                setAir.setAccessible(true);
-                setAir.invoke(player, 300);
-            } catch (Exception ignored) {}
-        }
-
-        // 2. УПРАВЛЕНИЕ СКОРОСТЬЮ И ФИЗИКОЙ ВОДЫ (Блок Mojmap)
+        // 1. УПРАВЛЕНИЕ СКОРОСТЬЮ И ФИЗИКОЙ ВОДЫ (Блок Mojmap)
         try {
             java.lang.reflect.Method isInWaterMethod = player.getClass().getMethod("isInWater");
             boolean inWater = (boolean) isInWaterMethod.invoke(player);
@@ -48,9 +30,9 @@ public class ExampleMixin {
 
                 double multiplier = 1.0;
                 if (onGround) {
-                    multiplier = 1.15; 
+                    multiplier = 1.15; // Скорость ходьбы на земле
                 } else if (inWater) {
-                    multiplier = 1.08; // Чуть увеличили скорость в воде для комфорта
+                    multiplier = 1.08; // Комфортная скорость в воде (без бешеного разгона)
                 }
 
                 java.lang.reflect.Method setDelta = player.getClass().getMethod("setDeltaMovement", vec3d.getClass());
@@ -59,7 +41,7 @@ public class ExampleMixin {
                 setDelta.invoke(player, newVec3d);
             }
         } catch (Exception e) {
-            // 3. УПРАВЛЕНИЕ СКОРОСТЬЮ И ФИЗИКОЙ ВОДЫ (Резервный блок Yarn)
+            // 2. УПРАВЛЕНИЕ СКОРОСТЬЮ И ФИЗИКОЙ ВОДЫ (Резервный блок Yarn)
             try {
                 java.lang.reflect.Method isSubmergedInWater = player.getClass().getMethod("isSubmergedInWater");
                 boolean inWaterYarn = (boolean) isSubmergedInWater.invoke(player);
@@ -85,7 +67,7 @@ public class ExampleMixin {
                     if (onGroundYarn) {
                         multiplier = 1.15;
                     } else if (inWaterYarn) {
-                        multiplier = 1.08; 
+                        multiplier = 1.08;
                     }
 
                     java.lang.reflect.Method setVelocity = player.getClass().getMethod("setVelocity", vec3dYarn.getClass());
