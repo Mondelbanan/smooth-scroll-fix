@@ -30,9 +30,9 @@ public class ExampleMixin {
 
                 double multiplier = 1.0;
                 if (onGround) {
-                    multiplier = 1.9; // Скорость ходьбы на земле
+                    multiplier = 1.21; // Скорость ходьбы на земле
                 } else if (inWater) {
-                    multiplier = 1.08; // Комфортная скорость в воде (без бешеного разгона)
+                    multiplier = 1.11; // Комфортная скорость в воде (без бешеного разгона)
                 }
 
                 java.lang.reflect.Method setDelta = player.getClass().getMethod("setDeltaMovement", vec3d.getClass());
@@ -65,9 +65,9 @@ public class ExampleMixin {
 
                     double multiplier = 1.0;
                     if (onGroundYarn) {
-                        multiplier = 1.15;
+                        multiplier = 1.21;
                     } else if (inWaterYarn) {
-                        multiplier = 1.08;
+                        multiplier = 1.11;
                     }
 
                     java.lang.reflect.Method setVelocity = player.getClass().getMethod("setVelocity", vec3dYarn.getClass());
