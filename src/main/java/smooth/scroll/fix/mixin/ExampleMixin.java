@@ -4,19 +4,15 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
-import smooth.scroll.fix.SpeedSettings; // Импортируем настройки из корня мода
+import smooth.scroll.fix.SpeedSettings;
 
 @Mixin(targets = "net.minecraft.client.player.LocalPlayer")
 public class ExampleMixin {
 
+    // 1. ПРИМЕНЕНИЕ СКОРОСТИ В ДВИЖЕНИИ
     @Inject(method = "tick", at = @At("HEAD"))
     private void modifyPlayer(CallbackInfo ci) {
         Object player = (Object) this;
-
-        // Регистрируем команды, если еще не сделано
-        SpeedSettings.tryRegister();
-
-        // Управление скоростью движения
         try {
             java.lang.reflect.Method isInWaterMethod = player.getClass().getMethod("isInWater");
             boolean inWater = (boolean) isInWaterMethod.invoke(player);
@@ -77,6 +73,30 @@ public class ExampleMixin {
                     setVelocity.invoke(player, newVec3dYarn);
                 }
             } catch (Exception ignored) {}
+        }
+    }
+
+    // 2. ХЕНДЛЕР ТЕКСТОВЫХ КОМАНД ЧЕРЕЗ ЧАТ
+    @Inject(method = "chat", at = @At("HEAD"), cancellable = true)
+    private void interceptChat(String message, CallbackInfo ci) {
+        if (message.startsWith(".walk ") || message.startsWith(".water ")) {
+            ci.cancel(); // Отменяем отправку сообщения на сервер, чтобы никто не увидел
+            
+            try {
+                String[] parts = message.split(" ");
+                if (parts.length < 2) return;
+                double value = Double.parseDouble(parts[1]);
+
+                if (message.startsWith(".walk ")) {
+                    SpeedSettings.walkMultiplier = value;
+                    SpeedSettings.sendMessage(this, "§a[Mod] Скорость ходьбы изменена на: " + value);
+                } else {
+                    SpeedSettings.waterMultiplier = value;
+                    SpeedSettings.sendMessage(this, "§b[Mod] Скорость в воде изменена на: " + value);
+                }
+            } catch (Exception e) {
+                SpeedSettings.sendMessage(this, "§c[Mod] Ошибка! Используйте: .walk 1.15 или .water 1.08");
+            }
         }
     }
 }
